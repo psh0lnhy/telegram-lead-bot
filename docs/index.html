@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LeadCatcher — Telegram lead bot demo</title>
+<meta name="description" content="Interactive demo of a Telegram bot that collects leads and stores them in Google Sheets." />
+<meta name="theme-color" content="#0f172a" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f172a'/%3E%3Cpath d='M7 16l17-7-5 16-4-6-8-3z' fill='%232dd4a7'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --ink: #0f172a;
+    --ink-2: #334155;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --accent: #0f766e;
+    --accent-2: #2dd4a7;
+    --bubble-bot: #ffffff;
+    --bubble-user: #0f766e;
+    --radius: 16px;
+    --shadow: 0 18px 40px -24px rgba(15, 23, 42, .45);
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--font);
+    background:
+      radial-gradient(900px 500px at 85% -10%, #d9f5ec 0%, transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    line-height: 1.55;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+  }
+  a { color: inherit; }
+  button { font: inherit; }
+
+  /* top bar */
+  .topbar {
+    background: rgba(255, 255, 255, .82);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .wrap { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 32px); }
+  .topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; letter-spacing: -.01em; }
+  .brand-mark {
+    width: 32px; height: 32px; border-radius: 9px; background: var(--ink);
+    display: grid; place-items: center; color: var(--accent-2);
+  }
+  .brand-mark svg { width: 20px; height: 20px; }
+  .tag {
+    font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    background: #e7f8f1; color: var(--accent); border: 1px solid #c6ecdf;
+    padding: 4px 8px; border-radius: 999px;
+  }
+  .top-actions { display: flex; align-items: center; gap: 8px; }
+  .link-btn, .ghost-btn {
+    border: 1px solid var(--line); background: #fff; color: var(--ink-2);
+    padding: 8px 14px; border-radius: 10px; cursor: pointer; text-decoration: none;
+    font-size: .88rem; font-weight: 600; transition: border-color .15s ease, background .15s ease;
+  }
+  .link-btn:hover, .ghost-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
+
+  /* layout */
+  .layout {
+    display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .9fr);
+    gap: clamp(16px, 2.6vw, 28px); align-items: start;
+    padding-block: clamp(20px, 4vw, 40px) 48px; flex: 1;
+  }
+
+  /* chat */
+  .chat {
+    background: #e9eef4;
+    border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+    display: flex; flex-direction: column;
+    min-height: 620px; max-height: calc(100vh - 160px);
+  }
+  .chat-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--line);
+  }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%; background: var(--ink);
+    color: var(--accent-2); display: grid; place-items: center; flex: none;
+  }
+  .avatar svg { width: 22px; height: 22px; }
+  .who { display: flex; flex-direction: column; line-height: 1.25; }
+  .who strong { font-size: .95rem; }
+  .who span { font-size: .76rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; display: inline-block; }
+  .chat-chip {
+    margin-left: auto; font-size: .66rem; font-weight: 700; letter-spacing: .1em;
+    color: var(--muted); border: 1px dashed #cbd5e1; border-radius: 999px; padding: 3px 8px;
+  }
+
+  .chat-body {
+    flex: 1; overflow-y: auto; padding: 18px 16px 8px;
+    display: flex; flex-direction: column; gap: 10px;
+    scroll-behavior: smooth;
+  }
+  .msg { display: flex; gap: 8px; max-width: 88%; }
+  .msg.bot { align-self: flex-start; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .bubble {
+    background: var(--bubble-bot); border: 1px solid rgba(15,23,42,.06);
+    border-radius: 14px 14px 14px 4px; padding: 10px 13px;
+    font-size: .92rem; box-shadow: 0 1px 1px rgba(15,23,42,.04);
+    overflow-wrap: anywhere;
+  }
+  .user .bubble {
+    background: var(--bubble-user); color: #fff; border: 0;
+    border-radius: 14px 14px 4px 14px;
+  }
+  .bubble b { font-weight: 700; }
+  .bubble code { font-family: var(--mono); font-size: .85em; background: rgba(15,23,42,.06); padding: 1px 4px; border-radius: 4px; }
+  .time { font-size: .68rem; color: var(--muted); margin-top: 4px; text-align: right; }
+  .user .time { color: rgba(255,255,255,.7); }
+
+  .keys { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .key {
+    border: 1px solid #cbd5e1; background: #f8fafc; color: var(--ink);
+    padding: 7px 12px; border-radius: 10px; font-size: .85rem; font-weight: 600;
+    cursor: pointer; transition: all .15s ease;
+  }
+  .key:hover { border-color: var(--accent); color: var(--accent); background: #effcf7; }
+  .key.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .key.primary:hover { background: #0b5f59; color: #fff; }
+  .key[disabled] { opacity: .45; cursor: default; }
+  .key[disabled]:hover { border-color: #cbd5e1; color: var(--ink); background: #f8fafc; }
+
+  .typing { display: inline-flex; gap: 3px; align-items: center; padding: 4px 2px; }
+  .typing span {
+    width: 6px; height: 6px; border-radius: 50%; background: #94a3b8;
+    animation: blink 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2) { animation-delay: .15s; }
+  .typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes blink { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+
+  .composer { display: flex; gap: 8px; padding: 12px; background: #fff; border-top: 1px solid var(--line); }
+  .composer input {
+    flex: 1; min-width: 0; border: 1px solid var(--line); background: #f8fafc; border-radius: 12px;
+    padding: 11px 14px; font: inherit; font-size: .92rem; color: var(--ink);
+  }
+  .composer input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(15,118,110,.14); }
+  .composer button {
+    width: 44px; height: 44px; border-radius: 12px; border: 0; background: var(--accent);
+    color: #fff; display: grid; place-items: center; cursor: pointer; flex: none;
+  }
+  .composer button:hover { background: #0b5f59; }
+  .composer button svg { width: 20px; height: 20px; }
+  .chat-note { font-size: .74rem; color: var(--muted); text-align: center; padding: 0 12px 10px; background: #fff; }
+
+  /* leads */
+  .leads {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 20px;
+  }
+  .leads-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .leads h2 { font-size: 1.05rem; margin: 0; letter-spacing: -.01em; }
+  .count {
+    margin-left: auto; font-size: .78rem; font-weight: 700; color: var(--accent);
+    background: #e7f8f1; border: 1px solid #c6ecdf; padding: 2px 9px; border-radius: 999px;
+  }
+  .leads-sub { font-size: .8rem; color: var(--muted); margin: 0 0 14px; }
+  .leads-actions { display: flex; gap: 8px; margin-bottom: 14px; }
+  .leads-actions button { flex: 1; }
+  .lead-list { display: flex; flex-direction: column; gap: 10px; }
+  .empty {
+    border: 1px dashed #cbd5e1; border-radius: 12px; padding: 22px 14px;
+    text-align: center; color: var(--muted); font-size: .85rem;
+  }
+  .lead {
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    animation: pop .25s ease;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .lead-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .lead-top strong { font-size: .92rem; }
+  .lead-id { margin-left: auto; font-family: var(--mono); font-size: .7rem; color: var(--muted); }
+  .lead dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: .82rem; }
+  .lead dt { color: var(--muted); }
+  .lead dd { margin: 0; overflow-wrap: anywhere; }
+  .leads-note { font-size: .75rem; color: var(--muted); margin: 16px 0 0; border-top: 1px solid var(--line); padding-top: 12px; }
+
+  footer { padding: 6px 0 28px; }
+  .footer-inner { font-size: .78rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .footer-inner a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(15,118,110,.3); }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .chat { min-height: 560px; max-height: none; height: 70vh; }
+  }
+  @media (max-width: 560px) {
+    .topbar-inner { height: auto; padding-block: 10px; flex-wrap: wrap; }
+    .tag { display: none; }
+    .chat { height: 74vh; }
+    .leads { padding: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="./" aria-label="LeadCatcher home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 12l15-6-4.5 14-3.6-5.4L4 12z" fill="currentColor"/></svg>
+      </span>
+      LeadCatcher
+      <span class="tag">interactive demo</span>
+    </a>
+    <div class="top-actions">
+      <a class="link-btn" id="repoLink" href="https://github.com/psh0lnhy/telegram-lead-bot" target="_blank" rel="noopener">Source code</a>
+      <button class="ghost-btn" id="resetDemo" type="button">Reset</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap layout">
+  <section class="chat" aria-label="Telegram bot demo">
+    <div class="chat-head">
+      <div class="avatar" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 12l15-6-4.5 14-3.6-5.4L4 12z" fill="currentColor"/></svg>
+      </div>
+      <div class="who">
+        <strong>LeadCatcher</strong>
+        <span><i class="dot" aria-hidden="true"></i> bot · online</span>
+      </div>
+      <span class="chat-chip">DEMO</span>
+    </div>
+
+    <div class="chat-body" id="chat" role="log" aria-live="polite" aria-label="Conversation"></div>
+
+    <form class="composer" id="composer" autocomplete="off">
+      <input id="input" type="text" placeholder="Send /start to begin" aria-label="Message" />
+      <button type="submit" aria-label="Send message">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 12l15-6-4.5 14-3.6-5.4L4 12z" fill="currentColor"/></svg>
+      </button>
+    </form>
+    <p class="chat-note">No real Telegram connection — everything runs in your browser.</p>
+  </section>
+
+  <aside class="leads" aria-label="Captured leads">
+    <div class="leads-head">
+      <h2>Captured leads</h2>
+      <span class="count" id="leadCount">0</span>
+    </div>
+    <p class="leads-sub">What the team sees in Google Sheets after each conversation.</p>
+    <div class="leads-actions">
+      <button class="ghost-btn" id="downloadCsv" type="button">Download CSV</button>
+      <button class="ghost-btn" id="clearLeads" type="button">Clear</button>
+    </div>
+    <div class="lead-list" id="leadList"></div>
+    <p class="leads-note">
+      In production, every row is appended to a Google Sheet and the team gets a Telegram notification.
+    </p>
+  </aside>
+</main>
+
+<footer>
+  <div class="wrap footer-inner">
+    <span>Concept project · Node.js bot + Google Apps Script backend</span>
+    <a href="https://github.com/psh0lnhy/telegram-lead-bot" target="_blank" rel="noopener">View the code</a>
+  </div>
+</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  const chat = document.getElementById("chat");
+  const composer = document.getElementById("composer");
+  const input = document.getElementById("input");
+  const leadList = document.getElementById("leadList");
+  const leadCount = document.getElementById("leadCount");
+  const STORAGE_KEY = "leadcatcher.leads.v1";
+
+  const SERVICES = [
+    { key: "website", label: "🌐 Website" },
+    { key: "bot", label: "🤖 Telegram bot" },
+    { key: "automation", label: "⚙️ Automation" },
+    { key: "other", label: "✳️ Something else" },
+  ];
+
+  const state = {
+    step: "idle",
+    data: { service: "", name: "", contact: "", comment: "" },
+    id: "",
+    leads: load(),
+  };
+
+  /* ---------------------------- storage ---------------------------- */
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function persist() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.leads));
+    } catch {
+      /* storage may be unavailable — demo still works in memory */
+    }
+  }
+
+  /* ----------------------------- chat ------------------------------ */
+
+  const clock = () =>
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  function bubble(html, who) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + who;
+    const inner = document.createElement("div");
+    inner.className = "bubble";
+    inner.innerHTML = html + '<div class="time">' + clock() + "</div>";
+    wrap.appendChild(inner);
+    return wrap;
+  }
+
+  function scrollDown() {
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function addUser(text) {
+    chat.appendChild(bubble(escapeHtml(text), "user"));
+    scrollDown();
+  }
+
+  function addBot(html, buttons) {
+    const node = bubble(html, "bot");
+    if (buttons && buttons.length) {
+      const keys = document.createElement("div");
+      keys.className = "keys";
+      buttons.forEach((b) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "key" + (b.primary ? " primary" : "");
+        btn.textContent = b.label;
+        btn.addEventListener("click", () => {
+          keys.querySelectorAll("button").forEach((x) => (x.disabled = true));
+          b.onClick();
+        });
+        keys.appendChild(btn);
+      });
+      node.querySelector(".bubble").appendChild(keys);
+    }
+    chat.appendChild(node);
+    scrollDown();
+  }
+
+  function botReply(html, buttons, delay = 550) {
+    const typing = document.createElement("div");
+    typing.className = "msg bot";
+    typing.innerHTML = '<div class="bubble"><span class="typing"><span></span><span></span><span></span></span></div>';
+    chat.appendChild(typing);
+    scrollDown();
+    window.setTimeout(() => {
+      typing.remove();
+      addBot(html, buttons);
+    }, delay);
+  }
+
+  const escapeHtml = (s) =>
+    String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  /* ----------------------------- flow ------------------------------ */
+
+  function startFlow() {
+    state.step = "service";
+    state.data = { service: "", name: "", contact: "", comment: "" };
+    state.id = "LC-" + Math.random().toString(36).slice(2, 7).toUpperCase();
+    setPlaceholder("Choose an option above");
+    botReply(
+      "<b>Hi!</b> I'm LeadCatcher — I collect requests for the team.<br>What can we help you with?",
+      SERVICES.map((s) => ({ label: s.label, onClick: () => pickService(s) }))
+    );
+  }
+
+  function pickService(service) {
+    state.data.service = service.label;
+    addUser(service.label);
+    state.step = "name";
+    setPlaceholder("Your name");
+    botReply("Great. What's your name?");
+  }
+
+  function askContact() {
+    state.step = "contact";
+    setPlaceholder("Phone or @username");
+    botReply("How can we reach you? Phone number or @username.");
+  }
+
+  function askComment() {
+    state.step = "comment";
+    setPlaceholder("Anything else?");
+    botReply("Anything else we should know? One or two sentences, or skip.", [
+      { label: "Skip", onClick: () => handleText("/skip") },
+    ]);
+  }
+
+  function askConfirm() {
+    state.step = "confirm";
+    setPlaceholder("Confirm above");
+    const d = state.data;
+    botReply(
+      "<b>Check your request:</b><br><br>" +
+        "Service: <b>" + escapeHtml(d.service) + "</b><br>" +
+        "Name: <b>" + escapeHtml(d.name) + "</b><br>" +
+        "Contact: <b>" + escapeHtml(d.contact) + "</b><br>" +
+        (d.comment ? "Comment: <i>" + escapeHtml(d.comment) + "</i><br>" : "") +
+        "<br>Lead ID: <code>" + state.id + "</code>",
+      [
+        { label: "✅ Send request", primary: true, onClick: () => saveLead() },
+        { label: "✏️ Start over", onClick: () => startFlow() },
+      ]
+    );
+  }
+
+  function saveLead() {
+    const d = state.data;
+    state.leads.unshift({
+      id: state.id,
+      createdAt: new Date().toISOString(),
+      service: d.service,
+      name: d.name,
+      contact: d.contact,
+      comment: d.comment,
+    });
+    persist();
+    renderLeads();
+
+    state.step = "done";
+    setPlaceholder("Send /start to create another request");
+    botReply(
+      "✅ <b>Done!</b> Your request <code>" + state.id + "</code> is in.<br><br>" +
+        "We'll get back to you within one business day."
+    );
+  }
+
+  function handleText(raw) {
+    const text = raw.trim();
+    if (!text) return;
+
+    if (text !== "/start") addUser(text);
+
+    if (text === "/start") {
+      startFlow();
+      return;
+    }
+    if (text === "/cancel") {
+      state.step = "idle";
+      setPlaceholder("Send /start to begin");
+      botReply("Cancelled. Send /start whenever you're ready.");
+      return;
+    }
+    if (text === "/help") {
+      botReply("<b>Commands</b><br>/start — new request<br>/cancel — reset<br>/stats — leads collected<br>/help — this message");
+      return;
+    }
+    if (text === "/stats") {
+      botReply("Leads collected: <b>" + state.leads.length + "</b>.");
+      return;
+    }
+
+    switch (state.step) {
+      case "idle":
+        botReply("Send /start to leave a request.");
+        return;
+      case "name":
+        if (text.length < 2) {
+          botReply("That looks too short. What's your name?");
+          return;
+        }
+        state.data.name = text;
+        askContact();
+        return;
+      case "contact":
+        if (!/^\+?[\d\s()-]{7,20}$/.test(text) && !/^@[a-zA-Z0-9_]{4,32}$/.test(text)) {
+          botReply("Please send a phone number (e.g. +48 500 123 456) or an @username.");
+          return;
+        }
+        state.data.contact = text;
+        askComment();
+        return;
+      case "comment":
+        state.data.comment = text === "/skip" ? "" : text;
+        askConfirm();
+        return;
+      case "confirm":
+        botReply("Press <b>Send request</b> above, or <b>Start over</b> to change something.");
+        return;
+      default:
+        botReply("Send /start to create a new request.");
+    }
+  }
+
+  function setPlaceholder(value) {
+    input.placeholder = value;
+  }
+
+  /* ----------------------------- leads ----------------------------- */
+
+  function renderLeads() {
+    leadCount.textContent = String(state.leads.length);
+    leadList.innerHTML = "";
+
+    if (!state.leads.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No leads yet. Complete the chat to add the first one.";
+      leadList.appendChild(empty);
+      return;
+    }
+
+    state.leads.forEach((lead) => {
+      const card = document.createElement("article");
+      card.className = "lead";
+      const when = new Date(lead.createdAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" });
+      card.innerHTML =
+        '<div class="lead-top"><strong>' + escapeHtml(lead.name) + "</strong>" +
+        '<span class="lead-id">' + escapeHtml(lead.id) + "</span></div>" +
+        "<dl>" +
+        "<dt>Service</dt><dd>" + escapeHtml(lead.service) + "</dd>" +
+        "<dt>Contact</dt><dd>" + escapeHtml(lead.contact) + "</dd>" +
+        (lead.comment ? "<dt>Comment</dt><dd>" + escapeHtml(lead.comment) + "</dd>" : "") +
+        "<dt>Time</dt><dd>" + escapeHtml(when) + "</dd>" +
+        "</dl>";
+      leadList.appendChild(card);
+    });
+  }
+
+  function csvCell(value) {
+    const s = String(value == null ? "" : value);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function downloadCsv() {
+    if (!state.leads.length) {
+      botReply("No leads to export yet — finish the chat first.");
+      return;
+    }
+    const header = ["Timestamp", "Lead ID", "Service", "Name", "Contact", "Comment"];
+    const rows = state.leads.map((l) =>
+      [l.createdAt, l.id, l.service, l.name, l.contact, l.comment].map(csvCell).join(",")
+    );
+    const csv = "\uFEFF" + [header.join(","), ...rows].join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "leads.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /* ----------------------------- wiring ---------------------------- */
+
+  composer.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const value = input.value;
+    input.value = "";
+    handleText(value);
+  });
+
+  document.getElementById("downloadCsv").addEventListener("click", downloadCsv);
+
+  document.getElementById("clearLeads").addEventListener("click", () => {
+    if (!state.leads.length) return;
+    state.leads = [];
+    persist();
+    renderLeads();
+  });
+
+  document.getElementById("resetDemo").addEventListener("click", () => {
+    state.step = "idle";
+    state.data = { service: "", name: "", contact: "", comment: "" };
+    chat.innerHTML = "";
+    setPlaceholder("Send /start to begin");
+    renderLeads();
+    botReply("Demo reset. Send /start to try the flow from the beginning.");
+  });
+
+  renderLeads();
+  botReply(
+    "👋 <b>This is an interactive demo.</b><br>Send <code>/start</code> to leave a request — " +
+      "no real data leaves your browser.",
+    null,
+    250
+  );
+})();
+</script>
+</body>
+</html>
