@@ -49,12 +49,23 @@ const API = `https://api.telegram.org/bot${TOKEN}`;
 
 /* --------------------------- Telegram API --------------------------- */
 
-async function call(method, payload) {
-  const response = await fetch(`${API}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+async function call(method, payload, attempt = 1) {
+  let response;
+  try {
+    response = await fetch(`${API}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    // Transient socket errors happen on long-poll connections; retry a couple of times.
+    if (attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+      return call(method, payload, attempt + 1);
+    }
+    error.cause = error.cause || {};
+    throw error;
+  }
   const data = await response.json().catch(() => ({}));
   if (!data.ok) {
     throw new Error(`${method}: ${data.description || response.status}`);
@@ -372,7 +383,7 @@ async function poll() {
           if (update.message) await onMessage(update.message);
           else if (update.callback_query) await onCallback(update.callback_query);
         } catch (error) {
-          console.error("update failed:", error.message);
+          console.error("update failed:", error.message, error.cause?.code || error.cause?.message || "");
         }
       }
     } catch (error) {
@@ -383,10 +394,14 @@ async function poll() {
   }
 }
 
-const me = await call("getMe").catch((error) => {
-  console.error("Could not reach Telegram:", error.message);
-  process.exit(1);
-});
+async function main() {
+  const me = await call("getMe").catch((error) => {
+    console.error("Could not reach Telegram:", error.message);
+    process.exit(1);
+  });
 
-console.log(`@${me.username} is running. Press Ctrl+C to stop.`);
-poll();
+  console.log(`@${me.username} is running. Press Ctrl+C to stop.`);
+  await poll();
+}
+
+main();

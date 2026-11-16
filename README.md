@@ -4,6 +4,7 @@ A Telegram bot that collects requests from clients and stores them in Google She
 Includes an interactive browser demo of the same conversation flow.
 
 **Live demo:** https://psh0lnhy.github.io/telegram-lead-bot/
+**Live bot:** https://t.me/leadcatcher_demo_bot
 **Repository:** https://github.com/psh0lnhy/telegram-lead-bot
 
 ![LeadCatcher demo](preview-demo.png)
